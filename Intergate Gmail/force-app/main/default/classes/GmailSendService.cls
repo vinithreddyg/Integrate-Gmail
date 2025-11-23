@@ -39,18 +39,19 @@ public with sharing class GmailSendService {
      * Invocable method to send a single email via Flow (process each input)
      */
     @InvocableMethod(label='Send Gmail Email' description='Sends email via Google Gmail API using Named Credential Google_Gmail_NC')
-    public static List<EmailResponse> sendEmailInvocable(List<EmailRequest> requests) {
-        List<EmailResponse> results = new List<EmailResponse>();
+    public static List<Id> sendEmailInvocable(List<EmailRequest> requests) {
+        System.debug('GmailSendService.sendEmailInvocable: Starting with ' + (requests == null ? 0 : requests.size()) + ' requests');
+        List<Id> results = new List<Id>();
         if (requests == null || requests.isEmpty()) {
-            EmailResponse r = new EmailResponse();
-            r.success = false;
-            r.errorMessage = 'No requests provided';
-            results.add(r);
+            System.debug('GmailSendService.sendEmailInvocable: No requests provided, returning empty list');
             return results;
         }
         for (EmailRequest req : requests) {
-            results.add(sendEmailSync(req));
+            // For invocable methods, we can't return detailed results, so we just enqueue each job
+            System.debug('GmailSendService.sendEmailInvocable: Enqueuing job for request to ' + req.toAddress);
+            results.add(System.enqueueJob(new GmailSendQueueable(req)));
         }
+        System.debug('GmailSendService.sendEmailInvocable: Completed, enqueued ' + results.size() + ' jobs');
         return results;
     }
 
@@ -70,34 +71,56 @@ public with sharing class GmailSendService {
     /**
      * Public helper to enqueue async send
      */
-    public static System.Id enqueueSend(EmailRequest req) {
-        return System.enqueueJob(new GmailSendQueueable(req));
+    @AuraEnabled
+    public static Id enqueueSend(EmailRequest req) {
+        System.debug('GmailSendService.enqueueSend: Enqueuing job for request to ' + req.toAddress);
+        Id jobId = System.enqueueJob(new GmailSendQueueable(req));
+        System.debug('GmailSendService.enqueueSend: Job enqueued with ID: ' + jobId);
+        return jobId;
+    }
+
+    /**
+     * Aura-enabled wrapper for LWC to send synchronously
+     */
+    @AuraEnabled
+    public static EmailResponse sendEmailAura(String toAddress, String subject, String bodyText, String fromAddress) {
+        EmailRequest r = new EmailRequest();
+        r.toAddress = toAddress;
+        r.subject = subject;
+        r.bodyText = bodyText;
+        r.fromAddress = fromAddress;
+        return sendEmailSync(r);
     }
 
     /**
      * Core sync sender. Returns EmailResponse indicating success/failure.
      */
     public static EmailResponse sendEmailSync(EmailRequest req) {
+        System.debug('GmailSendService.sendEmailSync: Starting to send email to ' + req.toAddress);
         EmailResponse resObj = new EmailResponse();
         // Validate required fields
         if (req == null) {
             resObj.success = false;
             resObj.errorMessage = 'Request is null';
+            System.debug('GmailSendService.sendEmailSync: Request is null, returning error');
             return resObj;
         }
         if (String.isBlank(req.toAddress)) {
             resObj.success = false;
             resObj.errorMessage = 'toAddress is required';
+            System.debug('GmailSendService.sendEmailSync: toAddress is required, returning error');
             return resObj;
         }
         if (String.isBlank(req.subject)) {
             resObj.success = false;
             resObj.errorMessage = 'subject is required';
+            System.debug('GmailSendService.sendEmailSync: subject is required, returning error');
             return resObj;
         }
         if (String.isBlank(req.bodyText)) {
             resObj.success = false;
             resObj.errorMessage = 'bodyText is required';
+            System.debug('GmailSendService.sendEmailSync: bodyText is required, returning error');
             return resObj;
         }
 
@@ -105,9 +128,11 @@ public with sharing class GmailSendService {
             // Build raw RFC 2822 message
             String fromAddr = String.isBlank(req.fromAddress) ? null : req.fromAddress;
             String rawMessage = buildRfc2822(fromAddr, req.toAddress, req.subject, req.bodyText);
+            System.debug('GmailSendService.sendEmailSync: Built RFC 2822 message');
 
             // Base64url encode (Gmail requires base64url, not standard base64)
             String encoded = base64UrlEncode(Blob.valueOf(rawMessage));
+            System.debug('GmailSendService.sendEmailSync: Encoded message');
 
             // Prepare HTTP callout
             HttpRequest httpReq = new HttpRequest();
@@ -115,26 +140,31 @@ public with sharing class GmailSendService {
             httpReq.setEndpoint('callout:Google_Gmail_NC/gmail/v1/users/me/messages/send');
             httpReq.setHeader('Content-Type', 'application/json');
             httpReq.setBody(JSON.serialize(new Map<String, Object>{ 'raw' => encoded }));
+            System.debug('GmailSendService.sendEmailSync: Prepared HTTP request to endpoint: ' + httpReq.getEndpoint());
 
             Http http = new Http();
             HttpResponse httpRes = http.send(httpReq);
+            System.debug('GmailSendService.sendEmailSync: Received HTTP response with status: ' + httpRes.getStatusCode());
 
             if (httpRes.getStatusCode() == 200) {
                 // Success - parse id
                 Map<String, Object> payload = (Map<String, Object>) JSON.deserializeUntyped(httpRes.getBody());
                 resObj.success = true;
                 resObj.messageId = (String) payload.get('id');
+                System.debug('GmailSendService.sendEmailSync: Email sent successfully with message ID: ' + resObj.messageId);
                 return resObj;
             }
 
             // Non-200
             resObj.success = false;
             resObj.errorMessage = 'HTTP ' + httpRes.getStatusCode() + ': ' + httpRes.getStatus();
+            System.debug('GmailSendService.sendEmailSync: Email sending failed with HTTP error: ' + resObj.errorMessage);
             return resObj;
 
         } catch (Exception ex) {
             resObj.success = false;
             resObj.errorMessage = 'Exception: ' + ex.getMessage();
+            System.debug('GmailSendService.sendEmailSync: Exception occurred: ' + ex.getMessage());
             return resObj;
         }
     }

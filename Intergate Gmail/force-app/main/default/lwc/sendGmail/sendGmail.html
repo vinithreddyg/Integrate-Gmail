@@ -1,0 +1,11 @@
+<template>
+  <lightning-card title="Send Gmail">
+    <div class="slds-p-around_medium">
+      <lightning-input label="To" value={to} onchange={toChange}></lightning-input>
+      <lightning-input label="Subject" value={subject} onchange={subjectChange}></lightning-input>
+      <lightning-textarea label="Body (HTML)" value={body} onchange={bodyChange}></lightning-textarea>
+      <lightning-button label="Send" onclick={send} class="slds-m-top_small"></lightning-button>
+      <p class="slds-m-top_small">{message}</p>
+    </div>
+  </lightning-card>
+</template>

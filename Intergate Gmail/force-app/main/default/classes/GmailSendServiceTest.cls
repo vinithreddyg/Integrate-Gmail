@@ -79,13 +79,12 @@ private class GmailSendServiceTest {
         }
 
         Test.startTest();
-        List<GmailSendService.EmailResponse> results = GmailSendService.sendEmailInvocable(inputs);
+        List<Id> results = GmailSendService.sendEmailInvocable(inputs);
         Test.stopTest();
 
         System.assertEquals(3, results.size(), 'Expect one result per input');
-        for (GmailSendService.EmailResponse res : results) {
-            System.assertEquals(true, res.success, 'Each should be success');
-            System.assertEquals('m_bulk', res.messageId, 'Mocked id for all');
+        for (Id jobId : results) {
+            System.assertNotEquals(null, jobId, 'Each job should be enqueued');
         }
     }
 

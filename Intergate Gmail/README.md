@@ -2,6 +2,18 @@
 
 This repo includes Apex services and tests to send emails through the Gmail API using a Salesforce Named Credential.
 
+Quick Setup Checklist
+- [ ] Google Cloud: Create/select project
+- [ ] Enable Gmail API
+- [ ] Configure OAuth consent screen (External or Internal)
+- [ ] Create OAuth Client ID (Web application)
+- [ ] Salesforce: Create Auth Provider (Google) and copy Callback URL
+- [ ] Google Cloud: Add Salesforce Callback URL to Authorized redirect URIs
+- [ ] Salesforce: Create Named Credential (or External Credential + Named Credential)
+- [ ] Authenticate/Authorize the Named Credential
+- [ ] Deploy LWC sendGmail and add it to a page
+- [ ] Test end-to-end and verify Gmail message created
+
 Key components:
 - Named Credential: Google_Gmail_NC (configured in Setup)
 - Apex service for sending: GmailSendService (Invocable + Queueable)
@@ -19,16 +31,16 @@ Salesforce Setup
 
 1) Create Google Auth Provider
 - Setup → Identity → Auth. Providers → New
-  - Provider Type: OpenID Connect
-  - Name: Google
+  - Provider Type: Google (or OpenID Connect with Google endpoints)
+  - Name: Google (or GoogleGmail)
   - Consumer Key: [Google Client ID]
   - Consumer Secret: [Google Client Secret]
   - Authorize Endpoint URL: https://accounts.google.com/o/oauth2/v2/auth
   - Token Endpoint URL: https://oauth2.googleapis.com/token
   - User Info Endpoint URL: https://openidconnect.googleapis.com/v1/userinfo
-  - Default Scopes: openid email profile
+  - Default Scopes: openid email profile https://www.googleapis.com/auth/gmail.send
   - Send client credentials in header: Enabled
-- Save and copy the Callback URL, add it to your Google OAuth "Authorized redirect URIs" if needed.
+- Save and copy the Callback URL, then add it to the Google OAuth client’s “Authorized redirect URIs”.
 
 2) Create Named Credential: Google_Gmail_NC
 - Setup → Security → Named Credentials → New
@@ -40,7 +52,7 @@ Salesforce Setup
   - Named Principal: one shared Gmail account (org-approved)
 - Authentication Protocol: OAuth 2.0
 - Auth Provider: select the Google provider created above
-- Scope: https://www.googleapis.com/auth/gmail.send (optionally add openid email profile)
+- Scope: https://www.googleapis.com/auth/gmail.send openid email profile
 - Save, then click Authenticate/Authorize to grant consent
   - If Per User, each user authorizes once on first use
 
@@ -64,7 +76,13 @@ Option B: Unit tests
 
 How to Send Email
 
-1) From Flow (Invocable)
+1) From LWC (sendGmail)
+- Deploy the provided LWC: force-app/main/default/lwc/sendGmail
+- Add it to an App/Home page in the Lightning App Builder (or Experience page)
+- Enter To, Subject, Body and click “Send (Sync)” or “Send (Async)”
+- On first use (Per User), Salesforce prompts for Google consent via the Named Credential
+
+2) From Flow (Invocable)
 - Action: Apex → Send Gmail Email
 - Inputs:
   - toAddress (required)
@@ -120,6 +138,9 @@ Files in this repo
 - force-app/main/default/classes/GmailNamedCredentialChecker.cls
 - force-app/main/default/classes/GmailSendServiceTest.cls
 - force-app/main/default/classes/GmailNamedCredentialCheckerTest.cls
+- force-app/main/default/lwc/sendGmail/sendGmail.html
+- force-app/main/default/lwc/sendGmail/sendGmail.js
+- force-app/main/default/lwc/sendGmail/sendGmail.js-meta.xml
 
 Notes
 - For Per User credentials, each user must authorize once. Provide instructions or a quick-start Flow that triggers authorization on first send.
