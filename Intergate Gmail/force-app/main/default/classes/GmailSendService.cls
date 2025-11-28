@@ -48,7 +48,7 @@ public with sharing class GmailSendService {
         }
         for (EmailRequest req : requests) {
             // For invocable methods, we can't return detailed results, so we just enqueue each job
-            System.debug('GmailSendService.sendEmailInvocable: Enqueuing job for request to ' + req.toAddress);
+            System.debug('GmailSendService.sendEmailInvocable: Enqueuing job for request to ' + (req != null && req.toAddress != null ? req.toAddress : 'unknown'));
             results.add(System.enqueueJob(new GmailSendQueueable(req)));
         }
         System.debug('GmailSendService.sendEmailInvocable: Completed, enqueued ' + results.size() + ' jobs');
@@ -73,7 +73,7 @@ public with sharing class GmailSendService {
      */
     @AuraEnabled
     public static Id enqueueSend(EmailRequest req) {
-        System.debug('GmailSendService.enqueueSend: Enqueuing job for request to ' + req.toAddress);
+        System.debug('GmailSendService.enqueueSend: Enqueuing job for request to ' + (req != null && req.toAddress != null ? req.toAddress : 'unknown'));
         Id jobId = System.enqueueJob(new GmailSendQueueable(req));
         System.debug('GmailSendService.enqueueSend: Job enqueued with ID: ' + jobId);
         return jobId;
@@ -162,9 +162,32 @@ public with sharing class GmailSendService {
             return resObj;
 
         } catch (Exception ex) {
-            resObj.success = false;
-            resObj.errorMessage = 'Exception: ' + ex.getMessage();
-            System.debug('GmailSendService.sendEmailSync: Exception occurred: ' + ex.getMessage());
+            // Enhanced error handling for named credential issues
+            String errorMsg = ex.getMessage();
+            System.debug('GmailSendService.sendEmailSync: Exception occurred: ' + errorMsg);
+            
+            // More specific error detection
+            if (errorMsg.contains('named credential') || errorMsg.contains('Named Credential') || errorMsg.contains('callout')) {
+                resObj.success = false;
+                resObj.errorMessage = 'Named Credential Error: The named credential "Google_Gmail_NC" is not properly configured. Please verify it exists and is authorized. ' +
+                                      'Error details: ' + errorMsg;
+                System.debug('GmailSendService.sendEmailSync: Named credential error detected: ' + errorMsg);
+            } else if (errorMsg.contains('endpoint') || errorMsg.contains('Endpoint')) {
+                resObj.success = false;
+                resObj.errorMessage = 'Endpoint Error: The endpoint could not be accessed. Please verify the named credential configuration and endpoint URL. ' +
+                                      'Error details: ' + errorMsg;
+                System.debug('GmailSendService.sendEmailSync: Endpoint error detected: ' + errorMsg);
+            } else if (errorMsg.contains('401') || errorMsg.contains('403')) {
+                resObj.success = false;
+                resObj.errorMessage = 'Authorization Error: The named credential is not authorized or has insufficient permissions. ' +
+                                      'Please re-authorize the named credential in Setup > Security > Named Credentials. ' +
+                                      'Error details: ' + errorMsg;
+                System.debug('GmailSendService.sendEmailSync: Authorization error detected: ' + errorMsg);
+            } else {
+                resObj.success = false;
+                resObj.errorMessage = 'Exception: ' + errorMsg;
+                System.debug('GmailSendService.sendEmailSync: Exception occurred: ' + errorMsg);
+            }
             return resObj;
         }
     }

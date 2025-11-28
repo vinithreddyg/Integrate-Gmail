@@ -1,0 +1,57 @@
+<template>
+    <lightning-card title="Gmail Named Credential Diagnostic" icon-name="standard:group">
+        <div class="slds-p-around_medium">
+            <lightning-button 
+                label="Run Diagnostic" 
+                onclick={handleDiagnose} 
+                disabled={isLoading}
+                variant="brand"
+                class="slds-m-bottom_small">
+            </lightning-button>
+            
+            <template if:true={isLoading}>
+                <div class="slds-text-align_center">
+                    <lightning-spinner alternative-text="Running diagnostic..." size="large"></lightning-spinner>
+                    <p>Checking Gmail Named Credential configuration...</p>
+                </div>
+            </template>
+            
+            <template if:true={diagnosticResult}>
+                <div class="slds-box slds-box_x-small slds-m-top_small">
+                    <template if:true={isSuccess}>
+                        <lightning-icon icon-name="utility:success" size="small" variant="success" class="slds-icon_container slds-m-right_x-small"></lightning-icon>
+                        <span class="slds-text-title_bold">Success!</span>
+                    </template>
+                    <template if:true={isError}>
+                        <lightning-icon icon-name="utility:error" size="small" variant="error" class="slds-icon_container slds-m-right_x-small"></lightning-icon>
+                        <span class="slds-text-title_bold">Issue Detected</span>
+                    </template>
+                    
+                    <p class="slds-m-top_small">{diagnosticResult.statusMessage}</p>
+                    <p class="slds-m-top_small">{diagnosticResult.detailedMessage}</p>
+                    
+                    <template if:true={hasSuggestions}>
+                        <div class="slds-m-top_small">
+                            <lightning-button 
+                                label={suggestionLabel} 
+                                onclick={toggleSuggestions} 
+                                variant="neutral"
+                                size="small">
+                            </lightning-button>
+                            
+                            <template if:true={showSuggestions}>
+                                <ul class="slds-list_dotted slds-m-top_small">
+                                    <template for:each={diagnosticResult.suggestions} for:item="suggestion">
+                                        <li key={suggestion} class="slds-item">
+                                            {suggestion}
+                                        </li>
+                                    </template>
+                                </ul>
+                            </template>
+                        </div>
+                    </template>
+                </div>
+            </template>
+        </div>
+    </lightning-card>
+</template>

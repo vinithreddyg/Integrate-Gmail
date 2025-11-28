@@ -122,11 +122,28 @@ Troubleshooting
   - Re-authorize if token expired or revoked
   - If on Google Workspace, get the OAuth app and scope approved by the admin
 - Redirect URI mismatch:
-  - Update Google OAuth client’s Authorized redirect URIs to match the Salesforce Auth Provider Callback URL
+  - Update Google OAuth client's Authorized redirect URIs to match the Salesforce Auth Provider Callback URL
 - Endpoint errors:
   - Verify endpoint is callout:Google_Gmail_NC/gmail/v1/users/me/messages/send
 - Base64 encoding:
   - Gmail requires base64url for the "raw" payload (handled in GmailSendService.base64UrlEncode)
+- Named Credential issues:
+  - The named credential "Google_Gmail_NC" might not exist in your org
+  - The named credential might not be properly authorized
+  - The named credential might have incorrect scopes
+  - Use the diagnostic utility: GmailNamedCredentialDiagnostic.diagnose()
+  - Check Setup → Security → Named Credentials for "Google_Gmail_NC"
+  - Verify the URL is set to https://gmail.googleapis.com/
+  - Confirm the Auth Provider is correctly linked
+  - Ensure the OAuth scopes include https://www.googleapis.com/auth/gmail.send
+  - If using a custom domain in Google Workspace, ensure the OAuth consent screen is configured properly
+  - For Per User credentials, ensure each user has authorized their account once
+- Specific error messages:
+  - "Named credential error detected: The callout couldn't access the endpoint": This typically means the named credential doesn't exist or isn't properly configured.
+  - "401 Unauthorized": The named credential needs to be re-authorized in Setup > Security > Named Credentials.
+  - "403 Forbidden": The named credential is authorized but lacks proper scopes.
+  - "404 Not Found": The endpoint URL in the named credential may be incorrect.
+  - "400 Bad Request": The request format may be incorrect or the named credential configuration is flawed.
 
 RFC 2822 Message Format (what we build)
 - Headers: From (optional), To, Subject, MIME-Version, Content-Type
@@ -136,11 +153,16 @@ RFC 2822 Message Format (what we build)
 Files in this repo
 - force-app/main/default/classes/GmailSendService.cls
 - force-app/main/default/classes/GmailNamedCredentialChecker.cls
+- force-app/main/default/classes/GmailNamedCredentialDiagnostic.cls
 - force-app/main/default/classes/GmailSendServiceTest.cls
 - force-app/main/default/classes/GmailNamedCredentialCheckerTest.cls
+- force-app/main/default/classes/GmailNamedCredentialDiagnosticTest.cls
 - force-app/main/default/lwc/sendGmail/sendGmail.html
 - force-app/main/default/lwc/sendGmail/sendGmail.js
 - force-app/main/default/lwc/sendGmail/sendGmail.js-meta.xml
+- force-app/main/default/lwc/gmailDiagnostic/gmailDiagnostic.html
+- force-app/main/default/lwc/gmailDiagnostic/gmailDiagnostic.js
+- force-app/main/default/lwc/gmailDiagnostic/gmailDiagnostic.js-meta.xml
 
 Notes
 - For Per User credentials, each user must authorize once. Provide instructions or a quick-start Flow that triggers authorization on first send.
